@@ -1,0 +1,16 @@
+{
+  "name": "nearle-mcp",
+  "version": "1.0.0",
+  "description": "Nearle Daily for Claude — MCP server (phone login, stores, search, order) on Nearle's existing APIs",
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  }
+}
