@@ -23,4 +23,18 @@ export const config = {
   orderUrl: env('ORDER_URL', 'https://queue.workolik.com/live/api/v1/mob/orders/createorder'),
   notifyUrl: env('NOTIFY_URL', 'https://jupiter.nearle.app/live/api/v1/utils/notifyadmin'),
   hasuraSecret: env('HASURA_SECRET', ''),
+  // OTP by SMS — same LionSMS account and DLT template as the app.
+  // If LIONSMS_KEY is empty, login falls back to mobile number only (testing).
+  sms: {
+    url: env('LIONSMS_URL', 'https://msg.lionsms.com/api/smsapi'),
+    key: env('LIONSMS_KEY'),
+    sender: env('LIONSMS_SENDER', 'NEARLE'),
+    templateId: env('LIONSMS_TEMPLATE_ID', '1107174712357438611'),
+    route: env('LIONSMS_ROUTE', '7'),
+    suffix: env('LIONSMS_SUFFIX', ''),
+  },
+  // Test login for app reviewers (Anthropic / OpenAI): this number + this OTP, no SMS sent.
+  reviewPhone: env('REVIEW_PHONE'),
+  reviewOtp: env('REVIEW_OTP'),
+  supportEmail: env('SUPPORT_EMAIL', 'support@nearle.app'),
 };

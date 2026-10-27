@@ -217,3 +217,18 @@ export async function notifyStore(store, customerName) {
     });
   } catch {}
 }
+
+// ── OTP SMS (same LionSMS template as the app) ────────────────────────────
+
+export async function sendOtpSms(phone, otp) {
+  const { url: base, key, sender, templateId, route, suffix } = config.sms;
+  const msg = `<#> Dear customer, use OTP ${otp} to sign in to Nearle App.\n${suffix}`;
+  const url =
+    `${base}?key=${encodeURIComponent(key)}&route=${route}` +
+    `&sender=${encodeURIComponent(sender)}&number=${encodeURIComponent(phone)}` +
+    `&sms=${encodeURIComponent(msg)}&templateid=${encodeURIComponent(templateId)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const text = await res.text();
+  console.log('[sms]', res.status, text.slice(0, 120));
+  return res.ok;
+}

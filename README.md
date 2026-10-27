@@ -1,33 +1,20 @@
-# Nearle Daily — MCP server for Claude
+# Nearle Daily — connector for Claude and ChatGPT
 
-Customers connect Nearle in Claude and sign in with their mobile number (your existing
-`customers/login` API). Then they can search products, compare prices and place Cash on Delivery
-orders on their own account.
+Search nearby Nearle stores, compare prices and place Cash on Delivery orders from Claude or ChatGPT.
+Customers sign in with their mobile number and an SMS OTP. Your backend is not changed.
 
-- Your backend is not changed.
-- No database: logins are signed tokens.
-- No Claude API key or AI key is needed.
+Pages: `/help` (docs) · `/privacy` (privacy policy) · `/mcp` (connector URL)
 
-Tools: list_stores · browse_store · search_products · place_order. Each shows a Nearle card in Claude with product photos, + / − buttons, a cart and a Place order button.
+## Render environment variables
+| Key | Value |
+|---|---|
+| SECRET_KEY | long random text (already set) |
+| HASURA_SECRET | nearle-admin-secret (already set) |
+| LIONSMS_KEY | your LionSMS key (same as the app) — turns on OTP |
+| REVIEW_PHONE | 7397177923 — test number, signs in without OTP |
+| SUPPORT_EMAIL | your support email (shown on /help and /privacy) |
 
-## Run free on Render
-1. Push this folder to a GitHub repo (keep `.env` out of it).
-2. On render.com, choose New → Web Service → pick the repo.
-   - Build: `npm install`
-   - Start: `npm start`
-   - Instance type: Free
-3. Under Environment, add:
-   - `SECRET_KEY` = 32+ random characters
-   - `HASURA_SECRET` = the same secret the app uses
-4. Deploy, then open `https://YOUR-APP.onrender.com`. You should see "running".
+Optional: LIONSMS_SENDER (NEARLE), LIONSMS_TEMPLATE_ID (1107174712357438611), LIONSMS_ROUTE (7),
+REVIEW_OTP (if set, the test number must enter this OTP instead).
 
-## Add it to Claude
-Go to Settings → Connectors → Add custom connector.
-- Name: Nearle Daily
-- URL: `https://YOUR-APP.onrender.com/mcp`
-
-Click Connect, and the Nearle sign-in page opens. Enter your mobile number, and you're done.
-
-## Own server instead
-    cp .env.example .env   # set PUBLIC_URL to your https address
-    npm install && npm start
+Without LIONSMS_KEY, login works with the mobile number only (testing).

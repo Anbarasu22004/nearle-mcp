@@ -8,6 +8,7 @@ import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middlew
 import { config } from './config.js';
 import { provider, loginRouter } from './auth.js';
 import { registerTools } from './tools.js';
+import { privacyPage, helpPage } from './pages.js';
 
 if (!config.secretKey || config.secretKey.length < 32) {
   console.error('Set SECRET_KEY (32+ random characters) in the environment.');
@@ -21,7 +22,9 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 
-app.get('/', (_req, res) => res.send('Nearle Daily MCP server is running.'));
+app.get('/', (_req, res) => res.send('Nearle Daily MCP server is running. See /help and /privacy.'));
+app.get('/privacy', (_req, res) => res.type('html').send(privacyPage()));
+app.get('/help', (_req, res) => res.type('html').send(helpPage()));
 
 // Logo and product photos for the Nearle card inside Claude.
 const LOGO = fs.readFileSync(new URL('./logo.png', import.meta.url));
@@ -71,7 +74,7 @@ app.use(
     baseUrl: base,
     resourceServerUrl: mcpUrl,
     resourceName: 'Nearle Daily',
-    serviceDocumentationUrl: new URL('/', base),
+    serviceDocumentationUrl: new URL('/help', base),
   }),
 );
 app.use(loginRouter);

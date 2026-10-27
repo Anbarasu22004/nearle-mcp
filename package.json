@@ -1,6 +1,6 @@
 {
   "name": "nearle-mcp",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Nearle Daily for Claude — MCP server with shop cards (phone login, stores, search, order)",
   "type": "module",
   "main": "server.js",

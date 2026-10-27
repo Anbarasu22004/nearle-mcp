@@ -105,75 +105,142 @@ export const provider = {
 
 const hash = (s) => crypto.createHash('sha256').update(s).digest('base64url').slice(0, 16);
 
-// ── Login page ────────────────────────────────────────────────────────────
+// ── Login page: mobile → OTP (SMS) → signed in ────────────────────────────
 
 export const loginRouter = express.Router();
 loginRouter.use(express.urlencoded({ extended: false }));
 
-// Simple per-IP limit so numbers can't be tried in bulk.
-const tries = new Map();
-function limited(ip) {
+const OTP_TTL = 5 * 60;
+const otpMac = (otp, phone, nonce) => mac(`otp|${otp}|${phone}|${nonce}`);
+const otpOn = () => Boolean(config.sms.key);
+const isReviewer = (phone) => config.reviewPhone && phone === config.reviewPhone.replace(/\D/g, '').slice(-10);
+
+// Limits: per IP (bulk tries) and per phone (SMS spam / guessing).
+const hits = new Map();
+function limited(key, max, windowMs) {
   const t = Date.now();
-  const list = (tries.get(ip) ?? []).filter((x) => t - x < 10 * 60 * 1000);
+  const list = (hits.get(key) ?? []).filter((x) => t - x < windowMs);
   list.push(t);
-  tries.set(ip, list);
-  return list.length > 10;
+  hits.set(key, list);
+  if (hits.size > 20000) hits.delete(hits.keys().next().value);
+  return list.length > max;
 }
+const wrongTries = new Map(); // nonce → count
 
-loginRouter.post('/login', async (req, res) => {
-  const lr = verify(req.body.req, 'lr');
-  if (!lr) return res.status(400).type('html').send(page({ error: 'This login link expired. Go back to Claude and connect again.' }));
+const cleanPhone = (v) => `${v ?? ''}`.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+const htmlSend = (res, opts, status = 200) => res.status(status).type('html').send(page(opts));
 
-  const phone = `${req.body.phone ?? ''}`.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
-  if (!/^[6-9]\d{9}$/.test(phone)) {
-    return res.type('html').send(page({ req: req.body.req, error: 'Enter a valid 10-digit mobile number.' }));
-  }
-  if (limited(req.ip)) {
-    return res.status(429).type('html').send(page({ req: req.body.req, error: 'Too many tries. Wait a few minutes.' }));
-  }
-
-  let customerId = null;
-  try {
-    customerId = await api.loginByPhone(phone);
-  } catch {}
-  if (!customerId) {
-    return res.type('html').send(page({ req: req.body.req, error: 'Could not sign in with this number. Try again.' }));
-  }
-
+function finish(res, lr, customerId) {
   const code = sign({ t: 'code', c: customerId, cid: lr.cid, r: lr.r, ch: lr.ch, exp: now() + CODE_TTL });
   const back = new URL(lr.r);
   back.searchParams.set('code', code);
   if (lr.s) back.searchParams.set('state', lr.s);
   res.redirect(302, back.href);
+}
+
+async function signIn(res, lr, reqToken, phone) {
+  let customerId = null;
+  try {
+    customerId = await api.loginByPhone(phone);
+  } catch {}
+  if (!customerId) return htmlSend(res, { req: reqToken, error: 'Could not sign in with this number. Try again.' });
+  finish(res, lr, customerId);
+}
+
+// Step 1: mobile number → send OTP
+loginRouter.post('/login', async (req, res) => {
+  const lr = verify(req.body.req, 'lr');
+  if (!lr) return htmlSend(res, { error: 'This login link expired. Go back to Claude and connect again.' }, 400);
+
+  const phone = cleanPhone(req.body.phone);
+  if (!/^[6-9]\d{9}$/.test(phone)) return htmlSend(res, { req: req.body.req, error: 'Enter a valid 10-digit mobile number.' });
+  if (limited(`ip:${req.ip}`, 15, 10 * 60e3) || limited(`ph:${phone}`, 4, 10 * 60e3)) {
+    return htmlSend(res, { req: req.body.req, error: 'Too many tries. Please wait a few minutes.' }, 429);
+  }
+
+  const nonce = crypto.randomBytes(9).toString('base64url');
+  // Test number (same as in the app): signs in without OTP, unless REVIEW_OTP is set.
+  if (isReviewer(phone) && !config.reviewOtp) return signIn(res, lr, req.body.req, phone);
+  const reviewer = isReviewer(phone) && config.reviewOtp;
+
+  if (!otpOn() && !reviewer) return signIn(res, lr, req.body.req, phone); // no SMS key set: mobile only
+
+  if (!reviewer) {
+    const otp = `${crypto.randomInt(100000, 1000000)}`;
+    let sent = false;
+    try {
+      sent = await api.sendOtpSms(phone, otp);
+    } catch {}
+    if (!sent) return htmlSend(res, { req: req.body.req, error: 'Could not send the OTP. Try again in a minute.' });
+    const ot = sign({ t: 'otp', lr: req.body.req, p: phone, n: nonce, h: otpMac(otp, phone, nonce), exp: now() + OTP_TTL });
+    return htmlSend(res, { otpToken: ot, phone });
+  }
+  const ot = sign({ t: 'otp', lr: req.body.req, p: phone, n: nonce, h: otpMac(config.reviewOtp, phone, nonce), exp: now() + OTP_TTL });
+  return htmlSend(res, { otpToken: ot, phone });
+});
+
+// Step 2: check OTP → Nearle login API → back to Claude
+loginRouter.post('/verify', async (req, res) => {
+  const o = verify(req.body.otp_token, 'otp');
+  if (!o) return htmlSend(res, { error: 'The OTP expired. Go back to Claude and connect again.' }, 400);
+  const lr = verify(o.lr, 'lr');
+  if (!lr) return htmlSend(res, { error: 'This login link expired. Go back to Claude and connect again.' }, 400);
+
+  const n = (wrongTries.get(o.n) ?? 0);
+  if (n >= 5 || limited(`ip:${req.ip}`, 30, 10 * 60e3)) {
+    return htmlSend(res, { req: o.lr, error: 'Too many wrong OTPs. Request a new one.' }, 429);
+  }
+  const otp = `${req.body.code ?? ''}`.replace(/\D/g, '');
+  const want = Buffer.from(o.h);
+  const got = Buffer.from(otpMac(otp, o.p, o.n));
+  if (otp.length !== 6 || want.length !== got.length || !crypto.timingSafeEqual(want, got)) {
+    wrongTries.set(o.n, n + 1);
+    if (wrongTries.size > 20000) wrongTries.delete(wrongTries.keys().next().value);
+    return htmlSend(res, { otpToken: req.body.otp_token, phone: o.p, error: `Wrong OTP. ${4 - n} tries left.` });
+  }
+  wrongTries.set(o.n, 99); // one use only
+  return signIn(res, lr, o.lr, o.p);
 });
 
 const esc = (s) => `${s}`.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-function page({ req = '', error = '' }) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Nearle Daily · Sign in</title>
-<style>
-:root{--ink:#1d1630;--muted:#6b6480;--brand:#6c3fd1;--bg:#f6f3fc;--card:#fff;--err:#c62828}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);
-font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);padding:16px}
-.card{width:100%;max-width:380px;background:var(--card);border-radius:20px;padding:28px 24px;box-shadow:0 8px 30px rgba(60,30,120,.08)}
-h1{font-size:22px;margin:0 0 4px}p{color:var(--muted);margin:0 0 20px;font-size:14px}
-label{font-size:13px;font-weight:600}
-.row{display:flex;align-items:center;border:1.5px solid #ddd5ef;border-radius:12px;margin:6px 0 16px;overflow:hidden}
-.row span{padding:0 10px 0 14px;color:var(--muted)}
-input{flex:1;border:0;outline:0;padding:14px 12px 14px 0;font-size:17px;letter-spacing:.5px;background:transparent}
-.row:focus-within{border-color:var(--brand)}
-button{width:100%;border:0;border-radius:12px;padding:14px;background:var(--brand);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
-.err{background:#fdecec;color:var(--err);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:14px}
-small{display:block;margin-top:14px;color:var(--muted);font-size:12px;text-align:center}
-</style></head><body><main class="card">
-<h1>Nearle Daily</h1><p>Sign in with your Nearle mobile number to order from Claude.</p>
-${error ? `<div class="err">${esc(error)}</div>` : ''}
-${req ? `<form method="post" action="/login">
+function page({ req = '', otpToken = '', phone = '', error = '' }) {
+  const masked = phone ? `+91 ${phone.slice(0, 2)}••••••${phone.slice(-2)}` : '';
+  const form = otpToken
+    ? `<form method="post" action="/verify">
+<input type="hidden" name="otp_token" value="${esc(otpToken)}">
+<label for="code">Enter the 6-digit OTP sent to ${esc(masked)}</label>
+<div class="row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" required autofocus style="letter-spacing:8px;padding-left:16px"></div>
+<button type="submit">Verify &amp; continue</button></form>
+<small>Didn't get it? Go back to Claude and connect again to resend.</small>`
+    : req
+      ? `<form method="post" action="/login">
 <input type="hidden" name="req" value="${esc(req)}">
 <label for="phone">Mobile number</label>
 <div class="row"><span>+91</span><input id="phone" name="phone" inputmode="numeric" autocomplete="tel-national" maxlength="10" placeholder="98765 43210" required autofocus></div>
-<button type="submit">Continue</button></form>
-<small>Orders go to your saved Nearle address · Cash on Delivery</small>` : ''}
+<button type="submit">${otpOn() ? 'Send OTP' : 'Continue'}</button></form>
+<small>Orders go to your saved Nearle address · Cash on Delivery<br>By continuing you agree to our <a href="/privacy" target="_blank">Privacy Policy</a></small>`
+      : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Nearle Daily · Sign in</title>
+<style>
+:root{--ink:#1d1630;--muted:#6b6480;--brand:#662582;--bg:#f6f1f9;--card:#fff;--err:#c62828}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);
+font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);padding:16px}
+.card{width:100%;max-width:380px;background:var(--card);border-radius:20px;padding:28px 24px;box-shadow:0 8px 30px rgba(60,30,120,.08)}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}.brand img{width:44px;height:44px;border-radius:12px}
+h1{font-size:20px;margin:0}p{color:var(--muted);margin:2px 0 0;font-size:13px}
+label{font-size:13px;font-weight:600;display:block}
+.row{display:flex;align-items:center;border:1.5px solid #ddd0e8;border-radius:12px;margin:6px 0 16px;overflow:hidden}
+.row span{padding:0 10px 0 14px;color:var(--muted)}
+input{flex:1;width:100%;border:0;outline:0;padding:14px 12px 14px 0;font-size:18px;letter-spacing:.5px;background:transparent;color:var(--ink)}
+.row:focus-within{border-color:var(--brand)}
+button{width:100%;border:0;border-radius:12px;padding:14px;background:var(--brand);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+.err{background:#fdecec;color:var(--err);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:14px}
+small{display:block;margin-top:14px;color:var(--muted);font-size:12px;text-align:center;line-height:1.6}a{color:var(--brand)}
+</style></head><body><main class="card">
+<div class="brand"><img src="/logo.png" alt=""><div><h1>Nearle Daily</h1><p>Sign in to order from Claude</p></div></div>
+${error ? `<div class="err">${esc(error)}</div>` : ''}
+${form}
 </main></body></html>`;
 }
