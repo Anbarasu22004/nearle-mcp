@@ -98,17 +98,36 @@ export async function stores(customerId, lat, lng) {
     }));
 }
 
-/** A store's products grouped by category. */
+/** A store's products grouped by category.
+ *  The app's grocery screen always asks for category 2, so ask for 2 and the
+ *  store's own category (if different) and merge. */
 export async function storeSections(store) {
-  const r = await http(
-    'GET',
-    `${f('products/getproductsbysubcategory')}?categoryid=${store.categoryid}&tenantid=${store.tenantid}&locationid=${store.locationid}`,
-  );
-  const details = r?.status === true ? r?.data?.details ?? [] : [];
-  return details.map((sec) => ({
-    name: sec.subcategoryname ?? 'Other',
-    products: (sec.products ?? []).map((p) => product(p, store, sec.subcategoryname)),
-  })).filter((s) => s.products.length);
+  const cats = [...new Set([2, store.categoryid || 2])];
+  const lists = await Promise.all(cats.map(async (cat) => {
+    try {
+      const r = await http(
+        'GET',
+        `${f('products/getproductsbysubcategory')}?categoryid=${cat}&tenantid=${store.tenantid}&locationid=${store.locationid}`,
+      );
+      return r?.status === true ? r?.data?.details ?? [] : [];
+    } catch {
+      return [];
+    }
+  }));
+  const byName = new Map();
+  const seen = new Set();
+  for (const sec of lists.flat()) {
+    const name = sec.subcategoryname ?? 'Other';
+    const out = byName.get(name) ?? [];
+    for (const raw of sec.products ?? []) {
+      const p = product(raw, store, name);
+      if (!p.productid || seen.has(p.productid)) continue;
+      seen.add(p.productid);
+      out.push(p);
+    }
+    byName.set(name, out);
+  }
+  return [...byName].map(([name, products]) => ({ name, products })).filter((s) => s.products.length);
 }
 
 /** Vector/label search across stores (scan/lookup). Label-only works too. */

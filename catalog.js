@@ -58,24 +58,85 @@ export async function products(store) {
   return (await sections(store)).flatMap((s) => s.products);
 }
 
-/** Search one item name across the customer's open stores. Cheapest first. */
-export async function search(cid, query, store = null) {
-  const words = norm(query).split(' ').filter((w) => w.length > 1);
-  if (!words.length) return [];
-  const targets = store ? [store] : (await stores(cid)).filter((s) => s.open);
-  const lists = await Promise.all(targets.map((s) => products(s).catch(() => [])));
-  const hits = [];
-  lists.forEach((list, i) => {
-    for (const p of list) {
-      if (!p.available || !p.price) continue;
-      const name = norm(p.name);
-      const score = words.filter((w) => name.includes(w) || name.includes(w.replace(/s$/, ''))).length;
-      if (score === words.length || (words.length > 2 && score >= words.length - 1)) {
-        hits.push({ ...p, store: targets[i].name, score });
-      }
+// Products seen in search results (some come from the lookup API and are not
+// in the store's category list), so place_order can find them again.
+const seenProducts = new Map();
+function remember(p, s) {
+  seenProducts.set(`${s.tenantid}:${p.productid}`, p);
+  if (seenProducts.size > 5000) seenProducts.delete(seenProducts.keys().next().value);
+}
+
+export async function findProduct(store, productid) {
+  const list = await products(store);
+  return list.find((x) => x.productid === productid) ?? seenProducts.get(`${store.tenantid}:${productid}`) ?? null;
+}
+
+// Local names people type → spellings used in product names.
+const ALIASES = [
+  ['tomato', 'thakkali'], ['onion', 'vengayam', 'pyaz'], ['potato', 'urulai', 'aloo'],
+  ['curd', 'dahi', 'yogurt', 'yoghurt'], ['chilli', 'chili', 'mirchi', 'milagai'],
+  ['coriander', 'dhania', 'kothamalli', 'cilantro'], ['rice', 'arisi'], ['ghee', 'nei'],
+  ['milk', 'paal'], ['oil', 'ennai'], ['mint', 'pudina', 'pudhina'], ['banana', 'vazhai', 'vazhaipazham'],
+  ['egg', 'eggs', 'muttai'], ['brinjal', 'eggplant', 'kathirikai'], ['lady finger', 'ladies finger', 'okra', 'vendakkai'],
+];
+
+function terms(query) {
+  const q = norm(query);
+  for (const group of ALIASES) {
+    if (group.some((a) => q.includes(a))) {
+      // keep extra words the user typed (e.g. "tomato 1kg" → size isn't a name word)
+      return group.map((a) => [a]);
     }
-  });
-  return hits.sort((a, b) => b.score - a.score || a.price - b.price).slice(0, 15);
+  }
+  return [q.split(' ').filter((w) => w.length > 1 && !/^\d+(kg|g|gm|ml|l|ltr|pcs)?$/.test(w))];
+}
+
+function matches(name, alts) {
+  const n = norm(name);
+  return alts.some((words) => words.length && words.every((w) => n.includes(w) || (w.endsWith('s') && n.includes(w.slice(0, -1)))));
+}
+
+/** Search one item across the customer's open stores (or one store). Cheapest first.
+ *  Same as the app: local catalogue match + the scan/lookup search API. */
+export async function search(cid, query, store = null) {
+  const alts = terms(query);
+  if (!alts[0]?.length) return [];
+  const all = await stores(cid);
+  const targets = store ? [store] : all.filter((s) => s.open).slice(0, 10);
+  const [lists, looked] = await Promise.all([
+    Promise.all(targets.map((s) => products(s).catch(() => []))),
+    lookupOffers(cid, query, store ? [store] : all.filter((s) => s.open)),
+  ]);
+
+  const hits = [];
+  const seen = new Set();
+  const add = (p, s) => {
+    const k = `${p.productid}:${s.tenantid}`;
+    if (!p.productid || !p.available || !p.price || seen.has(k)) return;
+    seen.add(k);
+    remember(p, s);
+    hits.push({ ...p, store: s.name, storeKm: s.km });
+  };
+  lists.forEach((list, i) => list.forEach((p) => matches(p.name, alts) && add(p, targets[i])));
+  // The search API can return loose matches, so use it only when the store lists had none.
+  if (!hits.length) for (const { p, s } of looked) add(p, s);
+  return hits.sort((a, b) => a.price - b.price).slice(0, 15);
+}
+
+async function lookupOffers(cid, query, allowed) {
+  try {
+    const a = await homeAddress(cid);
+    const opts = await api.lookup(cid, query, Number(a?.latitude) || 0, Number(a?.longitude) || 0, allowed.map((s) => s.tenantid));
+    const out = [];
+    for (const o of opts) {
+      const s = allowed.find((x) => `${x.tenantid}` === `${o.tenantid}` && `${x.locationid}` === `${o.locationid}`)
+        ?? allowed.find((x) => `${x.tenantid}` === `${o.tenantid}`);
+      if (s) out.push({ p: api.product(o, s), s });
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 const norm = (s) => `${s}`.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();

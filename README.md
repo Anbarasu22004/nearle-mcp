@@ -8,7 +8,7 @@ orders on their own account.
 - No database: logins are signed tokens.
 - No Claude API key or AI key is needed.
 
-Tools: list_stores · browse_store · search_products · place_order (shows the bill first, then orders after a yes)
+Tools: list_stores · browse_store · search_products · place_order. Each shows a Nearle card in Claude with product photos, + / − buttons, a cart and a Place order button.
 
 ## Run free on Render
 1. Push this folder to a GitHub repo (keep `.env` out of it).

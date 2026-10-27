@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Nearle Daily</title>
+<style>
+:root{
+  --fb-bg:#fff;--fb-bg2:#F7F5FA;--fb-ink:#1d1630;--fb-ink2:#4a4458;--fb-ink3:#7a748a;--fb-line:rgba(31,30,29,.12);
+  --brand:#662582; --brand-ink:#662582; --brand-soft:#F3E9F8; --brand-line:#E2CFEC; --pic:#fff;
+  --bg:var(--color-background-primary,var(--fb-bg)); --bg2:var(--color-background-secondary,var(--fb-bg2));
+  --ink:var(--color-text-primary,var(--fb-ink)); --ink2:var(--color-text-secondary,var(--fb-ink2)); --ink3:var(--color-text-tertiary,var(--fb-ink3));
+  --line:var(--color-border-tertiary,var(--fb-line)); --ok:var(--color-text-success,#265B19); --okbg:var(--color-background-success,#E9F1DC);
+  --bad:var(--color-text-danger,#7F2C28); --badbg:var(--color-background-danger,#F7ECEC);
+  --r:var(--border-radius-xl,12px); --rs:var(--border-radius-md,8px);
+  --font:var(--font-sans,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --fb-bg:#30302E;--fb-bg2:#262624;--fb-ink:#FAF9F5;--fb-ink2:#C2C0B6;--fb-ink3:#9C9A92;--fb-line:rgba(222,220,209,.15);
+  --brand-ink:#D2B0E8;--brand-soft:rgba(160,90,200,.22);--brand-line:rgba(210,176,232,.35);--okbg:#1B4614;--ok:#7AB948}}
+:root[data-theme="dark"]{
+  --fb-bg:#30302E;--fb-bg2:#262624;--fb-ink:#FAF9F5;--fb-ink2:#C2C0B6;--fb-ink3:#9C9A92;--fb-line:rgba(222,220,209,.15);
+  --brand-ink:#D2B0E8;--brand-soft:rgba(160,90,200,.22);--brand-line:rgba(210,176,232,.35)}
+*{box-sizing:border-box}
+html,body{margin:0;background:transparent;color:var(--ink);font-family:var(--font);font-size:var(--font-text-sm-size,14px);line-height:1.4}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:2px solid var(--brand-ink);outline-offset:2px}
+.app{padding:2px 0 4px}
+.head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.logo{width:34px;height:34px;border-radius:10px;flex:none;background:var(--brand)}
+.head h1{margin:0;font-size:var(--font-heading-sm-size,15px);font-weight:600}
+.head p{margin:0;color:var(--ink3);font-size:var(--font-text-xs-size,12px)}
+.head .grow{flex:1;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);white-space:nowrap}
+.group{margin:0 0 14px}
+.gtitle{display:flex;align-items:baseline;gap:8px;margin:0 0 8px;font-weight:600;font-size:var(--font-text-sm-size,14px)}
+.gtitle span{color:var(--ink3);font-weight:400;font-size:12px}
+.row{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 6px;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.card{flex:0 0 150px;scroll-snap-align:start;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.card.best{border-color:var(--brand-line)}
+.pic{height:108px;background:var(--pic);display:grid;place-items:center;position:relative}
+.pic img{max-width:86%;max-height:92px;object-fit:contain}
+.pic .ph{width:44px;height:44px;border-radius:12px;background:var(--brand-soft);display:grid;place-items:center;color:var(--brand-ink);font-weight:700;font-size:18px}
+.tag{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--brand);color:#fff;letter-spacing:.2px}
+.tag.off{left:auto;right:8px;background:#1A6B3C}
+.body{padding:8px 10px 10px;display:flex;flex-direction:column;gap:2px;flex:1}
+.name{font-weight:600;font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}
+.meta{color:var(--ink3);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.price{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.price b{font-size:15px}
+.price s{color:var(--ink3);font-size:11.5px}
+.add{margin-top:8px;height:36px;border-radius:var(--rs);border:1.5px solid var(--brand);color:var(--brand-ink);font-weight:700;letter-spacing:.3px;background:var(--brand-soft)}
+.add:hover{background:var(--brand);color:#fff}
+.step{margin-top:8px;height:36px;border-radius:var(--rs);background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:space-between;overflow:hidden}
+.step button{width:40px;height:36px;color:#fff;font-size:18px;font-weight:700}
+.step span{font-weight:700}
+.stores{display:flex;flex-direction:column;gap:8px}
+.store{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);text-align:left;width:100%}
+.store .av{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;font-weight:700;flex:none}
+.store .grow{flex:1;min-width:0}
+.store b{display:block;font-size:14px}
+.store small{color:var(--ink3)}
+.dot{width:8px;height:8px;border-radius:50%;background:#2E9D4E;display:inline-block;margin-right:4px}
+.dot.off{background:#B0A9BD}
+.cats{display:flex;flex-wrap:wrap;gap:8px}
+.cat{padding:10px 14px;border-radius:999px;border:1px solid var(--brand-line);background:var(--brand-soft);color:var(--brand-ink);font-weight:600;min-height:40px}
+.cat small{color:var(--ink3);font-weight:400;margin-left:4px}
+.back{color:var(--brand-ink);font-weight:600;padding:6px 0;margin-bottom:6px}
+.bar{margin-top:6px;display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;border-radius:var(--r);padding:8px 8px 8px 14px;box-shadow:0 6px 18px rgba(102,37,130,.25);animation:up .25s ease}
+.bar .grow{flex:1;min-width:0}
+.bar b{display:block;font-size:14px}
+.bar small{opacity:.85;font-size:11.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar button{background:#fff;color:#662582;font-weight:700;border-radius:var(--rs);padding:0 14px;height:40px;white-space:nowrap}
+.bill{border:1px solid var(--line);border-radius:var(--r);background:var(--bg);overflow:hidden}
+.bill .top{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--brand-soft)}
+.bill .top b{color:var(--brand-ink)}
+.lines{padding:6px 14px}
+.line{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.line:last-child{border-bottom:0}
+.line img,.line .ph{width:34px;height:34px;border-radius:8px;object-fit:contain;background:#fff;flex:none}
+.line .ph{background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;font-weight:700}
+.line .grow{flex:1;min-width:0}
+.line small{color:var(--ink3)}
+.sum{padding:8px 14px 12px;border-top:1px solid var(--line)}
+.sum div{display:flex;justify-content:space-between;padding:2px 0;color:var(--ink2)}
+.sum .total{color:var(--ink);font-weight:700;font-size:16px;padding-top:6px}
+.info{padding:10px 14px;background:var(--bg2);display:grid;gap:4px;font-size:12.5px;color:var(--ink2)}
+.info b{color:var(--ink)}
+.actions{display:flex;gap:8px;padding:12px 14px}
+.btn{flex:1;height:44px;border-radius:var(--rs);font-weight:700}
+.btn.pri{background:var(--brand);color:#fff}
+.btn.sec{border:1px solid var(--line);background:var(--bg)}
+.btn:disabled{opacity:.6;cursor:default}
+.done{text-align:center;padding:18px 14px 6px}
+.done .tick{width:56px;height:56px;border-radius:50%;margin:0 auto 10px;background:var(--okbg);color:var(--ok);display:grid;place-items:center;font-size:28px;animation:pop .35s ease}
+.done h2{margin:0 0 4px;font-size:18px}
+.done p{margin:0;color:var(--ink3)}
+.note{padding:10px 12px;border-radius:var(--rs);font-size:13px;margin:8px 0}
+.note.err{background:var(--badbg);color:var(--bad)}
+.empty{color:var(--ink3);padding:8px 0}
+.sk{background:linear-gradient(90deg,var(--bg2),var(--line),var(--bg2));background-size:200% 100%;animation:sh 1.2s infinite;border-radius:var(--r)}
+.toast{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:var(--color-background-inverse,#1d1630);color:var(--color-text-inverse,#fff);padding:8px 14px;border-radius:999px;font-size:12.5px;animation:up .2s ease;z-index:9}
+@keyframes up{from{opacity:0;transform:translateY(8px)}}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="root">
+  <div class="head"><img class="logo" src="__BASE__/logo.png" alt=""><div class="grow"><h1>Nearle Daily</h1><p>Loading…</p></div></div>
+  <div class="row"><div class="sk" style="flex:0 0 150px;height:220px"></div><div class="sk" style="flex:0 0 150px;height:220px"></div><div class="sk" style="flex:0 0 150px;height:220px"></div></div>
+</div>
+<script type="module">
+__APP_BUNDLE__
+
+const BASE = "__BASE__";
+const app = new __NearleApp({ name: "Nearle Daily", version: "1.0.0" });
+const root = document.getElementById("root");
+const rs = (n) => "₹" + (Math.round(n * 100) / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const initial = (s) => esc((String(s || "N").trim()[0] || "N").toUpperCase());
+
+let view = null;        // last structured result
+let prev = null;        // for "back" from a category
+const cart = { store_id: null, store: "", items: new Map() };   // productid → {item, qty}
+let busy = false;
+
+function header(sub, right = "") {
+  return `<div class="head"><img class="logo" src="${BASE}/logo.png" alt="Nearle"><div class="grow"><h1>Nearle Daily</h1><p>${esc(sub)}</p></div>${right}</div>`;
+}
+
+function pic(it, cls = "") {
+  return it.image
+    ? `<img src="${esc(it.image)}" alt="${esc(it.name)}" data-i="${initial(it.name)}" loading="lazy">`
+    : `<div class="ph ${cls}">${initial(it.name)}</div>`;
+}
+
+function productCard(it, best) {
+  const q = cart.store_id === it.store_id ? cart.items.get(it.productid)?.qty ?? 0 : 0;
+  const off = it.mrp && it.mrp > it.price ? Math.round((1 - it.price / it.mrp) * 100) : 0;
+  return `<div class="card ${best ? "best" : ""}">
+    <div class="pic">${pic(it)}${best ? '<span class="tag">LOWEST</span>' : ""}${off >= 5 ? `<span class="tag off">${off}% OFF</span>` : ""}</div>
+    <div class="body">
+      <div class="name" title="${esc(it.name)}">${esc(it.name)}</div>
+      <div class="meta">${esc([it.unit, it.store].filter(Boolean).join(" · "))}</div>
+      <div class="price"><b>${rs(it.price)}</b>${off ? `<s>${rs(it.mrp)}</s>` : ""}</div>
+      ${q ? `<div class="step"><button data-dec="${it.productid}" data-s="${it.store_id}" aria-label="Remove one">−</button><span>${q}</span><button data-inc="${it.productid}" data-s="${it.store_id}" aria-label="Add one">+</button></div>`
+          : `<button class="add" data-inc="${it.productid}" data-s="${it.store_id}">ADD</button>`}
+    </div></div>`;
+}
+
+const allItems = () => (view?.groups ?? []).flatMap((g) => g.items);
+
+function cartBar() {
+  if (!cart.items.size) return "";
+  let n = 0, t = 0;
+  for (const { item, qty } of cart.items.values()) { n += qty; t += item.price * qty; }
+  return `<div class="bar"><div class="grow"><b>${n} item${n > 1 ? "s" : ""} · ${rs(t)}</b><small>from ${esc(cart.store)}</small></div><button id="review">Review order</button></div>`;
+}
+
+function renderProducts() {
+  const groups = view.groups ?? [];
+  const sub = view.subtitle || "Cheapest first across nearby stores";
+  let h = header(sub);
+  if (prev) h += `<button class="back" id="back">← ${esc(prev.store?.name || "Back")}</button>`;
+  if (!groups.some((g) => g.items.length)) h += `<div class="empty">Nothing found for this. Try another name.</div>`;
+  for (const g of groups) {
+    if (!g.items.length) { h += `<div class="group"><div class="gtitle">${esc(g.title)} <span>not found nearby</span></div></div>`; continue; }
+    const min = Math.min(...g.items.map((i) => i.price));
+    const stores = new Set(g.items.map((i) => i.store_id)).size;
+    h += `<div class="group"><div class="gtitle">${esc(g.title)} <span>${g.items.length} option${g.items.length > 1 ? "s" : ""}${stores > 1 ? ` · ${stores} stores` : ""}</span></div>
+      <div class="row">${g.items.map((it) => productCard(it, stores > 1 && it.price === min)).join("")}</div></div>`;
+  }
+  root.innerHTML = h + cartBar();
+}
+
+function renderStores() {
+  const list = view.stores ?? [];
+  root.innerHTML = header(`${list.filter((s) => s.open).length} stores open near you`) +
+    `<div class="stores">${list.slice(0, 8).map((s) => `<button class="store" data-store="${s.store_id}">
+      <div class="av">${initial(s.name)}</div>
+      <div class="grow"><b>${esc(s.name)}</b><small><i class="dot ${s.open ? "" : "off"}"></i>${s.open ? "Open" : "Closed"}${s.distance_km != null ? ` · ${s.distance_km} km` : ""}${s.delivery_charge ? ` · Delivery ${rs(s.delivery_charge)}` : " · Free delivery"}</small></div>
+      <span class="chip">Browse</span></button>`).join("")}</div>`;
+}
+
+function renderCategories() {
+  const s = view.store;
+  root.innerHTML = header(`${s.name}${s.open ? "" : " · Closed now"}`) +
+    `<div class="cats">${(view.categories ?? []).map((c) => `<button class="cat" data-cat="${esc(c.name)}">${esc(c.name)}<small>${c.count}</small></button>`).join("")}</div>`;
+}
+
+function renderBill(placed = false) {
+  const b = view.bill;
+  let h = header(placed ? "Order placed" : "Review your order");
+  if (placed) {
+    h += `<div class="done"><div class="tick">✓</div><h2>Order placed!</h2><p>${esc(b.store)} · ${esc(b.slot)}</p></div>`;
+  }
+  h += `<div class="bill">
+    <div class="top"><div class="av" style="width:34px;height:34px;border-radius:10px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700">${initial(b.store)}</div>
+      <div style="flex:1"><b>${esc(b.store)}</b><div style="font-size:12px;color:var(--ink3)">${b.items.length} item${b.items.length > 1 ? "s" : ""}</div></div></div>
+    <div class="lines">${b.items.map((l) => `<div class="line">${l.image ? `<img src="${esc(l.image)}" alt="" data-i="${initial(l.name)}">` : `<div class="ph">${initial(l.name)}</div>`}
+      <div class="grow"><div>${esc(l.name)}</div><small>${esc(l.unit || "")} × ${l.qty}</small></div><b>${rs(l.amount)}</b></div>`).join("")}</div>
+    <div class="sum">
+      <div><span>Items</span><span>${rs(b.subtotal)}</span></div>
+      ${b.tax ? `<div><span>Tax</span><span>${rs(b.tax)}</span></div>` : ""}
+      <div><span>Delivery</span><span>${b.delivery ? rs(b.delivery) : "Free"}</span></div>
+      <div class="total"><span>Total</span><span>${rs(b.total)}</span></div>
+    </div>
+    <div class="info"><div>📍 <b>Deliver to</b> ${esc(b.address)}</div><div>🕑 <b>Slot</b> ${esc(b.slot)}</div><div>💵 <b>Payment</b> Cash on Delivery</div></div>
+    ${placed ? "" : `<div id="err"></div><div class="actions"><button class="btn sec" id="edit">Edit</button><button class="btn pri" id="place">Place order · ${rs(b.total)}</button></div>`}
+  </div>`;
+  if (placed) h += `<p style="text-align:center;color:var(--ink3);font-size:12px;margin:10px 0 0">Track it in the Nearle app</p>`;
+  root.innerHTML = h;
+}
+
+function render() {
+  if (!view) return;
+  if (view.error) { root.innerHTML = header("Something needs attention") + `<div class="note err">${esc(view.error)}</div>`; return; }
+  ({ products: renderProducts, stores: renderStores, categories: renderCategories, bill: () => renderBill(false), placed: () => renderBill(true) }[view.view] || (() => {}))();
+}
+
+function toast(msg) {
+  const t = Object.assign(document.createElement("div"), { className: "toast", textContent: msg });
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
+function show(result) {
+  const sc = result?.structuredContent;
+  if (result?.isError) view = { error: result.content?.[0]?.text || "Please try again." };
+  else if (sc?.view) view = sc;
+  else return;
+  render();
+}
+
+async function call(name, args) {
+  busy = true;
+  try { return await app.callServerTool({ name, arguments: args }); }
+  finally { busy = false; }
+}
+
+root.addEventListener("click", async (e) => {
+  const el = e.target.closest("button");
+  if (!el || busy) return;
+
+  if (el.dataset.inc || el.dataset.dec) {
+    const id = Number(el.dataset.inc || el.dataset.dec), sid = Number(el.dataset.s);
+    const item = allItems().find((i) => i.productid === id && i.store_id === sid);
+    if (!item) return;
+    if (cart.store_id && cart.store_id !== sid && el.dataset.inc) {
+      cart.items.clear(); toast(`Cart moved to ${item.store} — one store per order`);
+    }
+    cart.store_id = sid; cart.store = item.store;
+    const cur = cart.items.get(id)?.qty ?? 0;
+    const q = el.dataset.inc ? Math.min(cur + 1, 50) : cur - 1;
+    if (q <= 0) cart.items.delete(id); else cart.items.set(id, { item, qty: q });
+    if (!cart.items.size) cart.store_id = null;
+    render();
+    return;
+  }
+
+  if (el.id === "review" || el.id === "place") {
+    const placing = el.id === "place";
+    const order = placing && view.order ? view.order
+      : { store_id: cart.store_id, items: [...cart.items.values()].map(({ item, qty }) => ({ productid: item.productid, qty })) };
+    el.disabled = true; el.textContent = placing ? "Placing…" : "Loading…";
+    const r = await call("place_order", { ...order, confirm: placing });
+    if (r?.isError) {
+      const msg = r.content?.[0]?.text || "Please try again.";
+      if (placing) { el.disabled = false; el.textContent = "Try again"; document.getElementById("err").innerHTML = `<div class="note err" style="margin:10px 14px 0">${esc(msg)}</div>`; }
+      else { el.disabled = false; el.textContent = "Review order"; toast(msg); }
+      return;
+    }
+    prev = view.view === "products" ? view : prev;
+    show(r);
+    if (placing) {
+      cart.items.clear(); cart.store_id = null;
+      const b = r.structuredContent?.bill;
+      app.updateModelContext?.({ content: [{ type: "text", text:
+        `The user placed this Nearle order from the card (already done — do NOT place it again): ${b?.items?.map((l) => l.qty + " × " + l.name).join(", ")} from ${b?.store}, total ${rs(b?.total)}, Cash on Delivery, slot ${b?.slot}.` }] }).catch(() => {});
+    }
+    return;
+  }
+
+  if (el.id === "edit") {
+    if (prev) { view = prev; render(); return; }
+    const cards = view.cards ?? [];
+    cart.items.clear();
+    for (const c of cards) { cart.store_id = c.store_id; cart.store = c.store; cart.items.set(c.productid, { item: c, qty: c.qty || 1 }); }
+    view = { view: "products", subtitle: view.bill.store, groups: [{ title: "Your order", items: cards }] };
+    render();
+    return;
+  }
+
+  if (el.dataset.store) {
+    prev = null;
+    const r = await call("browse_store", { store: el.dataset.store }); show(r); return;
+  }
+  if (el.dataset.cat) {
+    const back = view;
+    const r = await call("browse_store", { store: String(view.store.store_id), category: el.dataset.cat });
+    prev = back; show(r); return;
+  }
+  if (el.id === "back" && prev) { view = prev; prev = null; render(); }
+});
+
+function applyCtx(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) __applyDocumentTheme(ctx.theme);
+  if (ctx.styles?.variables) __applyHostStyleVariables(ctx.styles.variables);
+  if (ctx.styles?.css?.fonts) __applyHostFonts(ctx.styles.css.fonts);
+  const s = ctx.safeAreaInsets;
+  if (s) root.style.padding = `${s.top || 2}px ${s.right || 0}px ${s.bottom || 4}px ${s.left || 0}px`;
+}
+
+// Broken product photo → show the letter tile instead.
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (img.tagName === "IMG" && !img.classList.contains("logo")) {
+    const d = document.createElement("div"); d.className = "ph"; d.textContent = img.dataset.i || "";
+    img.replaceWith(d);
+  }
+}, true);
+
+app.ontoolresult = show;
+app.onhostcontextchanged = applyCtx;
+await app.connect();
+applyCtx(app.getHostContext?.());
+</script>
+</body>
+</html>
